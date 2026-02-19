@@ -1,10 +1,13 @@
 # Application Runtime
 # Slim runtime image for running the application
-FROM debian:bookworm-slim
+FROM ghcr.io/djmott/qemu-aarch64-bookworm-qemu-builder:latest
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Clone vcpkg in the chroot environment at /opt/vcpkg
+RUN chroot /chroot git clone https://github.com/Microsoft/vcpkg.git /opt/vcpkg
 
 # Create non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser
