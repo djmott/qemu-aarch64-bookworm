@@ -1,0 +1,82 @@
+# QEMU ARM64 Builder/Emulator
+# Enables running and building aarch64 binaries on x86_64 via QEMU user-mode emulation
+FROM debian:bookworm-slim
+ENV DEBIAN_FRONTEND=noninteractive
+USER root
+
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    debootstrap \
+    qemu-user-static \
+    binfmt-support \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# Register binfmt for aarch64 (qemu-user-static auto-registers; ensure enabled)
+RUN update-binfmts --enable qemu-aarch64 2>/dev/null || true
+
+RUN debootstrap --arch=arm64 --foreign bookworm /chroot http://deb.debian.org/debian/ || true
+
+RUN echo ':qemu-aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:F' | tee /proc/sys/fs/binfmt_misc/register || true
+RUN cp /usr/bin/qemu-aarch64-static /chroot/usr/bin
+RUN chroot /chroot /debootstrap/debootstrap --second-stage || true
+RUN test -f /chroot/bin/bash || (echo "ERROR: debootstrap second-stage failed - /bin/bash not found" && exit 1)
+
+RUN chroot /chroot apt-get update
+RUN chroot /chroot apt-get install -y --no-install-recommends \
+    autoconf \
+    autoconf-archive \
+    automake \
+    binutils \
+    bison \
+    build-essential \
+    ca-certificates \
+    curl \
+    debhelper \
+    debmake \
+    flex \
+    g++ \
+    gcc \
+    git \
+    gnupg \
+    libdbus-1-dev \
+    libdrm-dev \
+    libsystemd-dev \
+    libtool \
+    libudev-dev \
+    libx11-dev \
+    libx11-xcb-dev \
+    libxext-dev \
+    libxrandr-dev \
+    libxss-dev \
+    linux-libc-dev \
+    lsb-release \
+    make \
+    meson \
+    ninja-build \
+    pkg-config \
+    python3-distutils \
+    python3-jinja2 \
+    software-properties-common \
+    tar \
+    unzip \
+    wget \
+    zip \
+    libudev-dev \
+    libiptc-dev \
+    libxtables-dev \
+    libsystemd-dev \
+    libgtest-dev \
+    '^libxcb.*-dev' \
+    libx11-xcb-dev \
+    libglu1-mesa-dev \
+    libxrender-dev \
+    libxss-dev \
+    libxi-dev \
+    libxkbcommon-dev \
+    libxkbcommon-x11-dev \
+    libegl1-mesa-dev \
+    libcurl4-openssl-dev \
+    libdrm-dev \
+    python3-jinja2 \
+    && chroot /chroot rm -rf /var/lib/apt/lists/*

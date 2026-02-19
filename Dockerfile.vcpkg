@@ -1,0 +1,21 @@
+# Application Runtime
+# Slim runtime image for running the application
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+WORKDIR /app
+
+# Placeholder for app binaries - copy your application here
+# COPY --chown=appuser:appuser ./bin /app/bin
+
+USER appuser
+
+EXPOSE 8080
+
+CMD ["/bin/sh", "-c", "echo 'Runtime container ready. Add your application entrypoint.'"]
