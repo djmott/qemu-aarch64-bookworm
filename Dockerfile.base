@@ -7,6 +7,7 @@ USER root
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     debootstrap \
+    fakeroot \
     qemu-user-static \
     binfmt-support \
     && rm -rf /var/lib/apt/lists/*
@@ -15,11 +16,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Register binfmt for aarch64 (qemu-user-static auto-registers; ensure enabled)
 RUN update-binfmts --enable qemu-aarch64 2>/dev/null || true
 
-RUN debootstrap --arch=arm64 --foreign bookworm /chroot http://deb.debian.org/debian/ || true
+# Stage 1: debootstrap --foreign (downloads packages for arm64)
+RUN fakeroot -s .fakeroot.state debootstrap --arch=arm64 --foreign bookworm /chroot http://deb.debian.org/debian/
+
+RUN mkdir -p /chroot/usr/bin
+RUN cp /usr/bin/qemu-aarch64-static /chroot/usr/bin
 
 RUN echo ':qemu-aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:F' | tee /proc/sys/fs/binfmt_misc/register || true
-RUN cp /usr/bin/qemu-aarch64-static /chroot/usr/bin
-RUN chroot /chroot /debootstrap/debootstrap --second-stage || true
+
+# Stage 2: debootstrap --second-stage (fakeroot avoids mount permission errors)
+RUN fakeroot -i .fakeroot.state -s .fakeroot.state chroot /chroot /debootstrap/debootstrap --second-stage
 RUN test -f /chroot/bin/bash || (echo "ERROR: debootstrap second-stage failed - /bin/bash not found" && exit 1)
 
 RUN chroot /chroot apt-get update
@@ -41,14 +47,24 @@ RUN chroot /chroot apt-get install -y --no-install-recommends \
     gnupg \
     libdbus-1-dev \
     libdrm-dev \
+    libegl1-mesa-dev \
+    libglu1-mesa-dev \
+    libgtest-dev \
+    libiptc-dev \
     libsystemd-dev \
     libtool \
     libudev-dev \
     libx11-dev \
     libx11-xcb-dev \
+    libcurl4-openssl-dev \
     libxext-dev \
+    libxi-dev \
+    libxkbcommon-dev \
+    libxkbcommon-x11-dev \
     libxrandr-dev \
+    libxrender-dev \
     libxss-dev \
+    libxtables-dev \
     linux-libc-dev \
     lsb-release \
     make \
@@ -62,21 +78,5 @@ RUN chroot /chroot apt-get install -y --no-install-recommends \
     unzip \
     wget \
     zip \
-    libudev-dev \
-    libiptc-dev \
-    libxtables-dev \
-    libsystemd-dev \
-    libgtest-dev \
     '^libxcb.*-dev' \
-    libx11-xcb-dev \
-    libglu1-mesa-dev \
-    libxrender-dev \
-    libxss-dev \
-    libxi-dev \
-    libxkbcommon-dev \
-    libxkbcommon-x11-dev \
-    libegl1-mesa-dev \
-    libcurl4-openssl-dev \
-    libdrm-dev \
-    python3-jinja2 \
     && chroot /chroot rm -rf /var/lib/apt/lists/*
