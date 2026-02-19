@@ -6,8 +6,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone vcpkg in the chroot environment at /opt/vcpkg
-RUN chroot /chroot git clone https://github.com/Microsoft/vcpkg.git /opt/vcpkg
+# Shallow clone vcpkg at baseline commit in the chroot environment at /opt/vcpkg
+RUN chroot /chroot bash -c "git init /opt/vcpkg && cd /opt/vcpkg && git remote add origin https://github.com/Microsoft/vcpkg.git && git fetch --depth 1 origin 4acadb7d732e662bbf130c4849be6d3a0aa6f6b9 && git checkout FETCH_HEAD"
+
+# Bootstrap vcpkg (with vcpkg env vars for chroot)
+RUN chroot /chroot bash -c "export VCPKG_FORCE_SYSTEM_BINARIES=1 VCPKG_DEFAULT_TRIPLET=arm64-linux-dynamic VCPKG_FEATURE_FLAGS=--no-cmake-config-cache VCPKG_DISABLE_METRICS=1 VCPKG_ROOT=/opt/vcpkg && cd /opt/vcpkg && ./bootstrap-vcpkg.sh"
+
+# Copy arm64-linux-dynamic triplet to vcpkg community triplets
+COPY arm64-linux-dynamic.cmake /chroot/opt/vcpkg/triplets/community/arm64-linux-dynamic.cmake
+
+# Copy manifest files and prebuild dependencies with binary caching
+COPY vcpkg.json vcpkg-configuration.json /chroot/tmp/
+RUN chroot /chroot bash -c "export VCPKG_FORCE_SYSTEM_BINARIES=1 VCPKG_DEFAULT_TRIPLET=arm64-linux-dynamic VCPKG_FEATURE_FLAGS=--no-cmake-config-cache VCPKG_DISABLE_METRICS=1 VCPKG_ROOT=/opt/vcpkg && cd /tmp && VCPKG_BINARY_SOURCES='clear;readwrite,/opt/vcpkg/cache' /opt/vcpkg/vcpkg install --triplet arm64-linux-dynamic"
+
+# Clean /tmp to conserve space
+RUN chroot /chroot bash -c "rm -rf /tmp/*"
 
 # Create non-root user for security
 RUN groupadd -r appuser && useradd -r -g appuser appuser

@@ -11,11 +11,11 @@ Docker images for QEMU ARM64 (aarch64) emulation and application runtime on Debi
 
 ## Build Locally
 
-Build in order (base image first):
+Build in order (base image first). The runtime Dockerfile expects the base image tagged as `ghcr.io/<owner>/qemu-aarch64-bookworm-qemu-builder:latest`:
 
 ```bash
 # 1. QEMU builder (base image - build first)
-docker build -f Dockerfile.base -t qemu-builder .
+docker build -f Dockerfile.base -t ghcr.io/djmott/qemu-aarch64-bookworm-qemu-builder:latest .
 
 # 2. Runtime
 docker build -f Dockerfile.vcpkg -t runtime .
